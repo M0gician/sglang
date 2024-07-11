@@ -259,7 +259,10 @@ class ModelRunner:
         logger.info(f"[gpu_id={self.gpu_id}] Set cuda device.")
         torch.cuda.set_device(self.gpu_id)
         logger.info(f"[gpu_id={self.gpu_id}] Init nccl begin.")
-        monkey_patch_vllm_p2p_access_check(self.gpu_id)
+
+        if not server_args.enable_p2p_check:
+            monkey_patch_vllm_p2p_access_check(self.gpu_id)
+
         if server_args.nccl_init_addr:
             nccl_init_method = f"tcp://{server_args.nccl_init_addr}"
         else:
@@ -405,7 +408,7 @@ class ModelRunner:
                 use_tensor_cores = False
 
             workspace_buffers = torch.empty(
-                3, 96 * 1024 * 1024, dtype=torch.uint8, device="cuda"
+                2, 96 * 1024 * 1024, dtype=torch.uint8, device="cuda"
             )
             self.flashinfer_prefill_wrapper_ragged = (
                 BatchPrefillWithRaggedKVCacheWrapper(workspace_buffers[0], "NHD")
@@ -414,7 +417,7 @@ class ModelRunner:
                 workspace_buffers[1], "NHD"
             )
             self.flashinfer_decode_wrapper = BatchDecodeWithPagedKVCacheWrapper(
-                workspace_buffers[2], "NHD", use_tensor_cores=use_tensor_cores
+                workspace_buffers[0], "NHD", use_tensor_cores=use_tensor_cores
             )
         else:
             self.flashinfer_prefill_wrapper_ragged = (

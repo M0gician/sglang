@@ -12,6 +12,7 @@ from sglang.utils import http_request
 
 
 class RuntimeEndpoint(BaseBackend):
+
     def __init__(
         self,
         base_url: str,
@@ -37,8 +38,7 @@ class RuntimeEndpoint(BaseBackend):
         self.model_info = res.json()
 
         self.chat_template = get_chat_template_by_model_path(
-            self.model_info["model_path"]
-        )
+            self.model_info["model_path"])
 
     def get_model_name(self):
         return self.model_info["model_path"]
@@ -124,6 +124,11 @@ class RuntimeEndpoint(BaseBackend):
         else:
             raise RuntimeError(f"Invalid dtype: {sampling_params.dtype}")
 
+        for item in ["return_logprob", "logprob_start_len", "top_logprobs_num", "return_text_in_logprobs"]:
+            value = getattr(sampling_params, item, None)
+            if value is not None:
+                data[item] = value
+
         self._add_images(s, data)
 
         res = http_request(
@@ -166,6 +171,11 @@ class RuntimeEndpoint(BaseBackend):
         else:
             raise RuntimeError(f"Invalid dtype: {sampling_params.dtype}")
 
+        for item in ["return_logprob", "logprob_start_len", "top_logprobs_num", "return_text_in_logprobs"]:
+            value = getattr(sampling_params, item, None)
+            if value is not None:
+                data[item] = value
+
         data["stream"] = True
         self._add_images(s, data)
 
@@ -180,7 +190,6 @@ class RuntimeEndpoint(BaseBackend):
         self._assert_success(res)
         pos = 0
 
-        incomplete_text = ""
         for chunk in res.iter_lines(decode_unicode=False):
             chunk = chunk.decode("utf-8")
             if chunk and chunk.startswith("data:"):
@@ -188,13 +197,9 @@ class RuntimeEndpoint(BaseBackend):
                     break
                 data = json.loads(chunk[5:].strip("\n"))
                 chunk_text = data["text"][pos:]
-                incomplete_text = data["incomplete_text"]
                 meta_info = data["meta_info"]
                 pos += len(chunk_text)
                 yield chunk_text, meta_info
-
-        if len(incomplete_text) > 0:
-            yield incomplete_text, meta_info
 
     def select(
         self,
